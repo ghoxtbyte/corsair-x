@@ -228,7 +228,7 @@ class CORSScanner:
 
         valid_urls = []
         
-        # Added SSL check ignore for smart protocol discovery
+        # SSL check ignore for smart protocol discovery
         connector = aiohttp.TCPConnector(ssl=False)
         async with aiohttp.ClientSession(connector=connector, timeout=self.timeout, headers=self.headers) as session:
             for scheme in schemes_to_try:
@@ -296,7 +296,7 @@ class CORSScanner:
             tqdm.write(f"{Fore.BLUE}[DEBUG] Target: {url} | Batches: {len(scan_batches)}")
 
         async with self.semaphore:
-            # Added SSL check ignore for actual scanning
+            # SSL check ignore for actual scanning
             connector = aiohttp.TCPConnector(ssl=False)
             async with aiohttp.ClientSession(connector=connector, timeout=self.timeout, headers=self.headers) as session:
                 
@@ -433,7 +433,7 @@ class Crawler:
             tqdm.write(f"{Fore.YELLOW}[DEBUG] Analyzing Asset: {url}")
             
         try:
-            # Added SSL check ignore for crawling assets
+            # SSL check ignore for crawling assets
             connector = aiohttp.TCPConnector(ssl=False)
             async with aiohttp.ClientSession(connector=connector, timeout=self.scanner.timeout, headers=self.scanner.headers) as session:
                 async with session.get(url, allow_redirects=True, proxy=current_proxy) as resp:
@@ -489,7 +489,7 @@ class Crawler:
             tqdm.write(f"{Fore.BLUE}[DEBUG] Crawling source: {url}")
 
         try:
-            # Added SSL check ignore for link extraction
+            # SSL check ignore for link extraction
             connector = aiohttp.TCPConnector(ssl=False)
             async with aiohttp.ClientSession(connector=connector, timeout=self.scanner.timeout, headers=self.scanner.headers) as session:
                 async with session.get(url, allow_redirects=True, proxy=current_proxy) as resp:
