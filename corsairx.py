@@ -50,7 +50,6 @@ INTERESTING_ASSETS = {
     '.js', '.json', '.xml', '.txt', '.conf', '.ini', '.config', '.env', '.ts', '.jsx', '.tsx'
 }
 
-
 # (?::\d+)? to capture optional port numbers
 REGEX_URL = r"https?://[a-zA-Z0-9.-]+(?::\d+)?(?:/[^\s'\"<>]*)?"
 
@@ -229,7 +228,9 @@ class CORSScanner:
 
         valid_urls = []
         
-        async with aiohttp.ClientSession(timeout=self.timeout, headers=self.headers) as session:
+        # Added SSL check ignore for smart protocol discovery
+        connector = aiohttp.TCPConnector(ssl=False)
+        async with aiohttp.ClientSession(connector=connector, timeout=self.timeout, headers=self.headers) as session:
             for scheme in schemes_to_try:
                 target = f"{scheme}://{base_url}"
                 if target.endswith('/'): target = target[:-1]
@@ -295,7 +296,9 @@ class CORSScanner:
             tqdm.write(f"{Fore.BLUE}[DEBUG] Target: {url} | Batches: {len(scan_batches)}")
 
         async with self.semaphore:
-            async with aiohttp.ClientSession(timeout=self.timeout, headers=self.headers) as session:
+            # Added SSL check ignore for actual scanning
+            connector = aiohttp.TCPConnector(ssl=False)
+            async with aiohttp.ClientSession(connector=connector, timeout=self.timeout, headers=self.headers) as session:
                 
                 for batch_type, origins_list in scan_batches:
                     
@@ -320,7 +323,8 @@ class CORSScanner:
 
                             try:
                                 req_func = getattr(session, method.lower())
-                                async with req_func(url, headers=request_headers, allow_redirects=True, proxy=current_proxy) as response:
+                                # allow_redirects is now handled by the user argument
+                                async with req_func(url, headers=request_headers, allow_redirects=self.args.follow_redirects, proxy=current_proxy) as response:
                                     
                                     acao = response.headers.get('Access-Control-Allow-Origin', '')
                                     acac = response.headers.get('Access-Control-Allow-Credentials', '').lower()
@@ -429,7 +433,9 @@ class Crawler:
             tqdm.write(f"{Fore.YELLOW}[DEBUG] Analyzing Asset: {url}")
             
         try:
-            async with aiohttp.ClientSession(timeout=self.scanner.timeout, headers=self.scanner.headers) as session:
+            # Added SSL check ignore for crawling assets
+            connector = aiohttp.TCPConnector(ssl=False)
+            async with aiohttp.ClientSession(connector=connector, timeout=self.scanner.timeout, headers=self.scanner.headers) as session:
                 async with session.get(url, allow_redirects=True, proxy=current_proxy) as resp:
                     if resp.status != 200:
                         return extracted
@@ -483,7 +489,9 @@ class Crawler:
             tqdm.write(f"{Fore.BLUE}[DEBUG] Crawling source: {url}")
 
         try:
-            async with aiohttp.ClientSession(timeout=self.scanner.timeout, headers=self.scanner.headers) as session:
+            # Added SSL check ignore for link extraction
+            connector = aiohttp.TCPConnector(ssl=False)
+            async with aiohttp.ClientSession(connector=connector, timeout=self.scanner.timeout, headers=self.scanner.headers) as session:
                 async with session.get(url, allow_redirects=True, proxy=current_proxy) as resp:
                     if resp.status != 200:
                         if self.scanner.args.debug:
@@ -616,6 +624,7 @@ async def main():
     scan_group.add_argument('--timeout', type=int, default=DEFAULT_TIMEOUT, help="Request timeout (seconds)")
     scan_group.add_argument('--concurrency', type=int, default=DEFAULT_CONCURRENCY, help="Concurrent requests")
     scan_group.add_argument('--acah', action='store_true', help="Include vulnerability even if Access-Control-Allow-Headers is present (Default: Skip)")
+    scan_group.add_argument('--follow-redirects', action='store_true', help="Follow redirects during CORS scanning (Default: False)")
     
     proxy_group = parser.add_argument_group('Proxy Configuration')
     proxy_group.add_argument('-p', '--proxy', help="Single Proxy (e.g., http://127.0.0.1:8080)")
