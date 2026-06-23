@@ -228,35 +228,36 @@ class CORSScanner:
 
         valid_urls = []
         
-        # SSL check ignore for smart protocol discovery
-        connector = aiohttp.TCPConnector(ssl=False)
-        async with aiohttp.ClientSession(connector=connector, timeout=self.timeout, headers=self.headers) as session:
-            for scheme in schemes_to_try:
-                target = f"{scheme}://{base_url}"
-                if target.endswith('/'): target = target[:-1]
-                
-                current_proxy = self.get_next_proxy()
+        # ADDED SEMAPHORE TO PREVENT SOCKET EXHAUSTION
+        async with self.semaphore:
+            connector = aiohttp.TCPConnector(ssl=False)
+            async with aiohttp.ClientSession(connector=connector, timeout=self.timeout, headers=self.headers) as session:
+                for scheme in schemes_to_try:
+                    target = f"{scheme}://{base_url}"
+                    if target.endswith('/'): target = target[:-1]
+                    
+                    current_proxy = self.get_next_proxy()
 
-                if self.args.debug:
-                    tqdm.write(f"{Fore.BLUE}[DEBUG] Probing: {target} | Proxy: {current_proxy}")
-
-                try:
-                    async with session.head(target, allow_redirects=True, proxy=current_proxy) as resp:
-                        valid_urls.append(str(resp.url))
-                        if self.args.debug:
-                            tqdm.write(f"{Fore.GREEN}[DEBUG] Alive (HEAD): {target} -> {resp.url}")
-                except Exception as e_head:
                     if self.args.debug:
-                        tqdm.write(f"{Fore.MAGENTA}[DEBUG] HEAD failed for {target}: {e_head}. Trying GET...")
+                        tqdm.write(f"{Fore.BLUE}[DEBUG] Probing: {target} | Proxy: {current_proxy}")
+
                     try:
-                        async with session.get(target, allow_redirects=True, proxy=current_proxy) as resp:
+                        async with session.head(target, allow_redirects=True, proxy=current_proxy) as resp:
                             valid_urls.append(str(resp.url))
                             if self.args.debug:
-                                tqdm.write(f"{Fore.GREEN}[DEBUG] Alive (GET): {target} -> {resp.url}")
-                    except Exception as e_get:
+                                tqdm.write(f"{Fore.GREEN}[DEBUG] Alive (HEAD): {target} -> {resp.url}")
+                    except Exception as e_head:
                         if self.args.debug:
-                            tqdm.write(f"{Fore.RED}[DEBUG] Failed {target}: {e_get}")
-                        continue
+                            tqdm.write(f"{Fore.MAGENTA}[DEBUG] HEAD failed for {target}: {e_head}. Trying GET...")
+                        try:
+                            async with session.get(target, allow_redirects=True, proxy=current_proxy) as resp:
+                                valid_urls.append(str(resp.url))
+                                if self.args.debug:
+                                    tqdm.write(f"{Fore.GREEN}[DEBUG] Alive (GET): {target} -> {resp.url}")
+                        except Exception as e_get:
+                            if self.args.debug:
+                                tqdm.write(f"{Fore.RED}[DEBUG] Failed {target}: {e_get}")
+                            continue
         
         return list(set(valid_urls))
 
@@ -296,7 +297,6 @@ class CORSScanner:
             tqdm.write(f"{Fore.BLUE}[DEBUG] Target: {url} | Batches: {len(scan_batches)}")
 
         async with self.semaphore:
-            # SSL check ignore for actual scanning
             connector = aiohttp.TCPConnector(ssl=False)
             async with aiohttp.ClientSession(connector=connector, timeout=self.timeout, headers=self.headers) as session:
                 
@@ -433,39 +433,40 @@ class Crawler:
             tqdm.write(f"{Fore.YELLOW}[DEBUG] Analyzing Asset: {url}")
             
         try:
-            # SSL check ignore for crawling assets
-            connector = aiohttp.TCPConnector(ssl=False)
-            async with aiohttp.ClientSession(connector=connector, timeout=self.scanner.timeout, headers=self.scanner.headers) as session:
-                async with session.get(url, allow_redirects=True, proxy=current_proxy) as resp:
-                    if resp.status != 200:
-                        return extracted
-                    
-                    content = await resp.text(errors='ignore')
-                    
-                    # 1. Regex for Absolute URLs (Now supports Ports!)
-                    found_urls = re.findall(REGEX_URL, content)
-                    for item in found_urls:
-                        if get_domain_from_url(item):
-                            extracted.add(item)
-                            
-                    # 2. Regex for Relative Paths
-                    found_paths = re.findall(REGEX_PATH, content)
-                    base_parsed = urlparse(url)
-                    base_root = f"{base_parsed.scheme}://{base_parsed.netloc}"
-                    
-                    for path in found_paths:
-                        path = path.strip()
-                        path = path.strip('"').strip("'")
+            # ADDED SEMAPHORE TO PREVENT SOCKET EXHAUSTION
+            async with self.scanner.semaphore:
+                connector = aiohttp.TCPConnector(ssl=False)
+                async with aiohttp.ClientSession(connector=connector, timeout=self.scanner.timeout, headers=self.scanner.headers) as session:
+                    async with session.get(url, allow_redirects=True, proxy=current_proxy) as resp:
+                        if resp.status != 200:
+                            return extracted
                         
-                        if len(path) > 1 and not " " in path and not "\n" in path:
-                            # Handle relative paths correctly even if they don't start with http
-                            try:
-                                full_asset_url = urljoin(base_root, path)
-                                # Validate the result looks like a URL
-                                if full_asset_url.startswith("http"):
-                                    extracted.add(full_asset_url)
-                            except:
-                                pass
+                        content = await resp.text(errors='ignore')
+                        
+                        # 1. Regex for Absolute URLs (Now supports Ports!)
+                        found_urls = re.findall(REGEX_URL, content)
+                        for item in found_urls:
+                            if get_domain_from_url(item):
+                                extracted.add(item)
+                                
+                        # 2. Regex for Relative Paths
+                        found_paths = re.findall(REGEX_PATH, content)
+                        base_parsed = urlparse(url)
+                        base_root = f"{base_parsed.scheme}://{base_parsed.netloc}"
+                        
+                        for path in found_paths:
+                            path = path.strip()
+                            path = path.strip('"').strip("'")
+                            
+                            if len(path) > 1 and not " " in path and not "\n" in path:
+                                # Handle relative paths correctly even if they don't start with http
+                                try:
+                                    full_asset_url = urljoin(base_root, path)
+                                    # Validate the result looks like a URL
+                                    if full_asset_url.startswith("http"):
+                                        extracted.add(full_asset_url)
+                                except:
+                                    pass
 
             if self.scanner.args.debug and len(extracted) > 0:
                 tqdm.write(f"{Fore.GREEN}[DEBUG] Found {len(extracted)} items in {url}")
@@ -489,15 +490,16 @@ class Crawler:
             tqdm.write(f"{Fore.BLUE}[DEBUG] Crawling source: {url}")
 
         try:
-            # SSL check ignore for link extraction
-            connector = aiohttp.TCPConnector(ssl=False)
-            async with aiohttp.ClientSession(connector=connector, timeout=self.scanner.timeout, headers=self.scanner.headers) as session:
-                async with session.get(url, allow_redirects=True, proxy=current_proxy) as resp:
-                    if resp.status != 200:
-                        if self.scanner.args.debug:
-                            tqdm.write(f"{Fore.MAGENTA}[DEBUG] Crawl skipped {url}, status {resp.status}")
-                        return links
-                    html = await resp.text(errors='ignore')
+            # ADDED SEMAPHORE TO PREVENT SOCKET EXHAUSTION
+            async with self.scanner.semaphore:
+                connector = aiohttp.TCPConnector(ssl=False)
+                async with aiohttp.ClientSession(connector=connector, timeout=self.scanner.timeout, headers=self.scanner.headers) as session:
+                    async with session.get(url, allow_redirects=True, proxy=current_proxy) as resp:
+                        if resp.status != 200:
+                            if self.scanner.args.debug:
+                                tqdm.write(f"{Fore.MAGENTA}[DEBUG] Crawl skipped {url}, status {resp.status}")
+                            return links
+                        html = await resp.text(errors='ignore')
                     
             soup = BeautifulSoup(html, 'html.parser')
             
