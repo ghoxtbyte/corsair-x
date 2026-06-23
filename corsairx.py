@@ -228,7 +228,7 @@ class CORSScanner:
 
         valid_urls = []
         
-        # ADDED SEMAPHORE TO PREVENT SOCKET EXHAUSTION
+        # SEMAPHORE TO PREVENT SOCKET EXHAUSTION
         async with self.semaphore:
             connector = aiohttp.TCPConnector(ssl=False)
             async with aiohttp.ClientSession(connector=connector, timeout=self.timeout, headers=self.headers) as session:
@@ -433,7 +433,7 @@ class Crawler:
             tqdm.write(f"{Fore.YELLOW}[DEBUG] Analyzing Asset: {url}")
             
         try:
-            # ADDED SEMAPHORE TO PREVENT SOCKET EXHAUSTION
+            # SEMAPHORE TO PREVENT SOCKET EXHAUSTION
             async with self.scanner.semaphore:
                 connector = aiohttp.TCPConnector(ssl=False)
                 async with aiohttp.ClientSession(connector=connector, timeout=self.scanner.timeout, headers=self.scanner.headers) as session:
@@ -490,7 +490,7 @@ class Crawler:
             tqdm.write(f"{Fore.BLUE}[DEBUG] Crawling source: {url}")
 
         try:
-            # ADDED SEMAPHORE TO PREVENT SOCKET EXHAUSTION
+            # SEMAPHORE TO PREVENT SOCKET EXHAUSTION
             async with self.scanner.semaphore:
                 connector = aiohttp.TCPConnector(ssl=False)
                 async with aiohttp.ClientSession(connector=connector, timeout=self.scanner.timeout, headers=self.scanner.headers) as session:
