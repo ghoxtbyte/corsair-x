@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/corsairx.png" alt="RefleXSS - Context-Aware Reflected XSS Scanner" width="100%">
+</p>
+
 # CORSAIR-X | Advanced CORS Misconfiguration Scanner
 
 ![CORSAIR-X Banner](https://img.shields.io/badge/Security-CORS%20Scanner-red?style=for-the-badge&logo=security)
