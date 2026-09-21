@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/corsairx.png" alt="RefleXSS - Context-Aware Reflected XSS Scanner" width="100%">
+  <img src="assets/corsairx.png" alt="CORSAIR-X - A blazing fast, asynchronous CORS misconfiguration scanner with built-in crawling, smart protocol detection, and advanced header support" width="100%">
 </p>
 
 # CORSAIR-X | Advanced CORS Misconfiguration Scanner
